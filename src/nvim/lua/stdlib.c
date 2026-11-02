@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <lauxlib.h>
+#include <limits.h>
 #include <lua.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -37,6 +38,7 @@
 #include "nvim/lua/spell.h"
 #include "nvim/lua/stdlib.h"
 #include "nvim/lua/xdiff.h"
+#include "nvim/macros_defs.h"
 #include "nvim/map_defs.h"
 #include "nvim/mbyte.h"
 #include "nvim/mbyte_defs.h"
@@ -240,7 +242,7 @@ static int nlua_str_utf_start(lua_State *const lstate) FUNC_ATTR_NONNULL_ALL
     return luaL_error(lstate, "index out of range");
   }
   size_t const off = (size_t)(offset - 1);
-  int head_off = -utf_cp_bounds_len(s1, s1 + off, (int)(s1_len - off)).begin_off;
+  int head_off = -utf_cp_bounds_len(s1, s1 + off, (int)MIN(s1_len - off, (size_t)INT_MAX)).begin_off;
   lua_pushinteger(lstate, head_off);
   return 1;
 }
@@ -261,7 +263,7 @@ static int nlua_str_utf_end(lua_State *const lstate) FUNC_ATTR_NONNULL_ALL
     return luaL_error(lstate, "index out of range");
   }
   size_t const off = (size_t)(offset - 1);
-  int tail_off = utf_cp_bounds_len(s1, s1 + off, (int)(s1_len - off)).end_off - 1;
+  int tail_off = utf_cp_bounds_len(s1, s1 + off, (int)MIN(s1_len - off, (size_t)INT_MAX)).end_off - 1;
   lua_pushinteger(lstate, tail_off);
   return 1;
 }
