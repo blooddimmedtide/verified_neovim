@@ -343,6 +343,7 @@ static const char e_invalid_use_of_underscore[]
   = N_("E63: Invalid use of \\_");
 static const char e_pattern_uses_more_memory_than_maxmempattern[]
   = N_("E363: Pattern uses more memory than 'maxmempattern'");
+static const char e_value_too_large[] = N_("E951: \\% value too large");
 static const char e_invalid_item_in_str_brackets[]
   = N_("E369: Invalid item in %s%%[]");
 static const char e_missing_delimiter_after_search_pattern_str[]
@@ -4791,6 +4792,10 @@ static uint8_t *regatom(int *flagp)
         }
         while (ascii_isdigit(c)) {
           got_digit = true;
+          if (n > (UINT32_MAX - (uint32_t)(c - '0')) / 10) {
+            // overflow: the number would wrap around
+            EMSG_RET_NULL(_(e_value_too_large));
+          }
           n = n * 10 + (uint32_t)(c - '0');
           c = getchr();
         }
@@ -8715,7 +8720,6 @@ static const int nfa_classcodes[] = {
 static const char e_nul_found[] = N_("E865: (NFA) Regexp end encountered prematurely");
 static const char e_misplaced[] = N_("E866: (NFA regexp) Misplaced %c");
 static const char e_ill_char_class[] = N_("E877: (NFA regexp) Invalid character class: %" PRId64);
-static const char e_value_too_large[] = N_("E951: \\% value too large");
 
 // Variables only used in nfa_regcomp() and descendants.
 static int nfa_re_flags;  ///< re_flags passed to nfa_regcomp().
