@@ -2104,7 +2104,7 @@ CharBoundsOff utf_cp_bounds_len(char const *base, char const *p_in, int p_len)
     return (CharBoundsOff){ 0, 1 };
   }
 
-  int const max_first_off = -MIN((int)(p - b), MB_MAXCHAR - 1);
+  int const max_first_off = -(int)MIN(p - b, MB_MAXCHAR - 1);
   int first_off = 0;
   for (; utf_is_trail_byte(p[first_off]); first_off--) {
     if (first_off == max_first_off) {  // failed to find first byte
