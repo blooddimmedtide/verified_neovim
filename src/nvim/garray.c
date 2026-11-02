@@ -10,6 +10,7 @@
 #include "nvim/gettext_defs.h"
 #include "nvim/log.h"
 #include "nvim/macros_defs.h"
+#include "nvim/main.h"
 #include "nvim/memory.h"
 #include "nvim/message.h"
 #include "nvim/path.h"
@@ -79,13 +80,20 @@ void ga_grow(garray_T *gap, int n)
     WLOG("ga_growsize(%d) is less than 1", gap->ga_growsize);
   }
 
+  // ga_maxlen is an int: it cannot count more than INT_MAX items.
+  if (n > INT_MAX - gap->ga_len) {
+    preserve_exit(_("Nvim: Data too large to fit into virtual memory space\n"));
+  }
+  const int room = INT_MAX - gap->ga_len;
+
   // the garray grows by at least growsize
-  n = MAX(n, gap->ga_growsize);
+  n = MAX(n, MIN(gap->ga_growsize, room));
 
   // A linear growth is very inefficient when the array grows big.  This
   // is a compromise between allocating memory that won't be used and too
-  // many copy operations. A factor of 1.5 seems reasonable.
-  n = MAX(n, gap->ga_len / 2);
+  // many copy operations. A factor of 1.5 seems reasonable, as long as
+  // the item count still fits in an int.
+  n = MAX(n, MIN(gap->ga_len / 2, room));
 
   int new_maxlen = gap->ga_len + n;
 
@@ -143,13 +151,23 @@ char *ga_concat_strings(const garray_T *gap, const char *sep)
     return xstrdup("");
   }
 
+  // The same string may appear many times, so the total can exceed what
+  // exists in memory: stop instead of letting the length wrap around.
   size_t len = 0;
   for (size_t i = 0; i < nelem; i++) {
-    len += strlen(strings[i]);
+    const size_t slen = strlen(strings[i]);
+    if (slen > SIZE_MAX - len) {
+      preserve_exit(_("Nvim: Data too large to fit into virtual memory space\n"));
+    }
+    len += slen;
   }
 
   // add some space for the (num - 1) separators
-  len += (nelem - 1) * strlen(sep);
+  const size_t seplen = strlen(sep);
+  if (seplen != 0 && nelem - 1 > (SIZE_MAX - len) / seplen) {
+    preserve_exit(_("Nvim: Data too large to fit into virtual memory space\n"));
+  }
+  len += (nelem - 1) * seplen;
   char *const ret = xmallocz(len);
 
   char *s = ret;
