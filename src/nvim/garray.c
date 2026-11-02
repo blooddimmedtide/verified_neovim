@@ -151,13 +151,23 @@ char *ga_concat_strings(const garray_T *gap, const char *sep)
     return xstrdup("");
   }
 
+  // The same string may appear many times, so the total can exceed what
+  // exists in memory: stop instead of letting the length wrap around.
   size_t len = 0;
   for (size_t i = 0; i < nelem; i++) {
-    len += strlen(strings[i]);
+    const size_t slen = strlen(strings[i]);
+    if (slen > SIZE_MAX - len) {
+      preserve_exit(_("Nvim: Data too large to fit into virtual memory space\n"));
+    }
+    len += slen;
   }
 
   // add some space for the (num - 1) separators
-  len += (nelem - 1) * strlen(sep);
+  const size_t seplen = strlen(sep);
+  if (seplen != 0 && nelem - 1 > (SIZE_MAX - len) / seplen) {
+    preserve_exit(_("Nvim: Data too large to fit into virtual memory space\n"));
+  }
+  len += (nelem - 1) * seplen;
   char *const ret = xmallocz(len);
 
   char *s = ret;
