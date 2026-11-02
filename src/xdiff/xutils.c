@@ -143,8 +143,13 @@ int xdl_blankline(const char *line, long size, long flags)
 {
 	long i;
 
+	/*
+	 * Without whitespace flags only an empty line is blank: "\n", or
+	 * nothing at all. (A last line without a newline has size 1 when it
+	 * holds one character, and that is not blank.)
+	 */
 	if (!(flags & XDF_WHITESPACE_FLAGS))
-		return (size <= 1);
+		return size == 0 || (size == 1 && line[0] == '\n');
 
 	for (i = 0; i < size && XDL_ISSPACE(line[i]); i++)
 		;
