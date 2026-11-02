@@ -343,6 +343,7 @@ static const char e_invalid_use_of_underscore[]
   = N_("E63: Invalid use of \\_");
 static const char e_pattern_uses_more_memory_than_maxmempattern[]
   = N_("E363: Pattern uses more memory than 'maxmempattern'");
+static const char e_value_too_large[] = N_("E951: \\% value too large");
 static const char e_invalid_item_in_str_brackets[]
   = N_("E369: Invalid item in %s%%[]");
 static const char e_missing_delimiter_after_search_pattern_str[]
@@ -1117,24 +1118,29 @@ static int64_t gethexchrs(int maxinputlen)
 
 // Get and return the value of the decimal string immediately after the
 // current position. Return -1 for invalid.  Consumes all digits.
+// A value above INT_MAX is returned as INT_MAX + 1, so that a long run of
+// digits cannot overflow.
 static int64_t getdecchrs(void)
 {
   int64_t nr = 0;
-  int c;
-  int i;
+  const char *const start = regparse;
 
-  for (i = 0;; i++) {
-    c = (uint8_t)regparse[0];
+  while (true) {
+    const int c = (uint8_t)regparse[0];
     if (c < '0' || c > '9') {
       break;
     }
-    nr *= 10;
-    nr += c - '0';
+    if (nr <= INT_MAX) {
+      nr = nr * 10 + (c - '0');
+    }
+    if (nr > INT_MAX) {
+      nr = (int64_t)INT_MAX + 1;
+    }
     regparse++;
     curchr = -1;     // no longer valid
   }
 
-  if (i == 0) {
+  if (regparse == start) {
     return -1;
   }
   return nr;
@@ -4786,6 +4792,10 @@ static uint8_t *regatom(int *flagp)
         }
         while (ascii_isdigit(c)) {
           got_digit = true;
+          if (n > (UINT32_MAX - (uint32_t)(c - '0')) / 10) {
+            // overflow: the number would wrap around
+            EMSG_RET_NULL(_(e_value_too_large));
+          }
           n = n * 10 + (uint32_t)(c - '0');
           c = getchr();
         }
@@ -5283,7 +5293,7 @@ static uint8_t *regpiece(int *flagp)
     }
     regtail(ret, regnode(END));             // operand ends
     if (lop == BEHIND || lop == NOBEHIND) {
-      if (nr < 0) {
+      if (nr < 0 || nr > INT_MAX) {
         nr = 0;                 // no limit is same as zero limit
       }
       reginsert_nr(lop, (uint32_t)nr, ret);
@@ -8710,10 +8720,18 @@ static const int nfa_classcodes[] = {
 static const char e_nul_found[] = N_("E865: (NFA) Regexp end encountered prematurely");
 static const char e_misplaced[] = N_("E866: (NFA regexp) Misplaced %c");
 static const char e_ill_char_class[] = N_("E877: (NFA regexp) Invalid character class: %" PRId64);
-static const char e_value_too_large[] = N_("E951: \\% value too large");
 
 // Variables only used in nfa_regcomp() and descendants.
 static int nfa_re_flags;  ///< re_flags passed to nfa_regcomp().
+/// Set when a \{n,m} count would make the NFA program too big; vim_regcomp()
+/// then compiles the pattern with the backtracking engine.
+static bool nfa_too_big;
+
+/// Most postfix items a \{n,m} expansion may produce.  Each item becomes
+/// about one NFA state (40 bytes).  The limit keeps the largest patterns in
+/// the tests (about 8 million items, under half a gigabyte) on the NFA engine
+/// while stopping counts that would need many gigabytes.
+#define NFA_MAX_POSTFIX_LEN (1 << 24)
 static int *post_start;   ///< holds the postfix form of r.e.
 static size_t post_start_len;  ///< size of allocated post_start (in ints)
 static int *post_end;
@@ -8779,6 +8797,7 @@ static void nfa_regcomp_start(uint8_t *expr, int re_flags)
   post_ptr = post_start;
   post_end = post_start + post_start_len;
   wants_nfa = false;
+  nfa_too_big = false;
   rex.nfa_has_zend = false;
   rex.nfa_has_backref = false;
   nfa_reg_parse_depth = 0;
@@ -10875,6 +10894,11 @@ collection:
     int plen;
 
 nfa_do_multibyte:
+    // A backslash before a character that can't be made magic is
+    // ignored (see peekchr()); the character itself starts after it.
+    if (*old_regparse == '\\' && c >= 0x80) {
+      old_regparse++;
+    }
     // plen is length of current char with composing chars
     if (utf_char2len(c) != (plen = utfc_ptr2len((char *)old_regparse))
         || utf_iscomposing_legacy(c)) {
@@ -11010,7 +11034,9 @@ static int nfa_regpiece(void)
     EMIT(i);
     if (i == NFA_PREV_ATOM_JUST_BEFORE
         || i == NFA_PREV_ATOM_JUST_BEFORE_NEG) {
-      EMIT((int)c2);
+      // A limit too large for an int means no limit, like in the
+      // backtracking engine.
+      EMIT(c2 > INT_MAX ? 0 : (int)c2);
     }
     break;
 
@@ -11070,6 +11096,20 @@ static int nfa_regpiece(void)
         && (maxval != MAX_LIMIT && minval < 200)
         && !wants_nfa) {
       return FAIL;
+    }
+
+    // The expansion makes "copies" copies of the atom, each followed by
+    // at most two more items.  When that is too big, fail and let
+    // vim_regcomp() use the backtracking engine, whichever engine was
+    // asked for: otherwise the allocation can make Nvim exit.
+    {
+      const int64_t atom_len = (int64_t)(post_ptr - post_start) - my_post_start;
+      const int64_t copies = maxval == MAX_LIMIT ? (int64_t)minval + 1 : (int64_t)maxval;
+      if (copies > NFA_MAX_POSTFIX_LEN
+          || my_post_start + copies * (atom_len + 2) > NFA_MAX_POSTFIX_LEN) {
+        nfa_too_big = true;
+        return FAIL;
+      }
     }
 
     // Ignore previous call to nfa_regatom()
@@ -16226,7 +16266,10 @@ regprog_T *vim_regcomp(const char *expr_arg, int re_flags)
     // also fails for patterns that it can't handle well but are still valid
     // patterns, thus a retry should work.
     // But don't try if an error message was given.
-    if (regexp_engine == AUTOMATIC_ENGINE && called_emsg == called_emsg_before) {
+    // Also when the NFA engine was asked for but the pattern is too big
+    // for it.
+    if ((regexp_engine == AUTOMATIC_ENGINE || (regexp_engine == NFA_ENGINE && nfa_too_big))
+        && called_emsg == called_emsg_before) {
       regexp_engine = BACKTRACKING_ENGINE;
       report_re_switch(expr);
       prog = bt_regengine.regcomp((uint8_t *)expr, re_flags);
