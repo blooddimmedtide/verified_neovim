@@ -1117,24 +1117,29 @@ static int64_t gethexchrs(int maxinputlen)
 
 // Get and return the value of the decimal string immediately after the
 // current position. Return -1 for invalid.  Consumes all digits.
+// A value above INT_MAX is returned as INT_MAX + 1, so that a long run of
+// digits cannot overflow.
 static int64_t getdecchrs(void)
 {
   int64_t nr = 0;
-  int c;
-  int i;
+  const char *const start = regparse;
 
-  for (i = 0;; i++) {
-    c = (uint8_t)regparse[0];
+  while (true) {
+    const int c = (uint8_t)regparse[0];
     if (c < '0' || c > '9') {
       break;
     }
-    nr *= 10;
-    nr += c - '0';
+    if (nr <= INT_MAX) {
+      nr = nr * 10 + (c - '0');
+    }
+    if (nr > INT_MAX) {
+      nr = (int64_t)INT_MAX + 1;
+    }
     regparse++;
     curchr = -1;     // no longer valid
   }
 
-  if (i == 0) {
+  if (regparse == start) {
     return -1;
   }
   return nr;
@@ -5283,7 +5288,7 @@ static uint8_t *regpiece(int *flagp)
     }
     regtail(ret, regnode(END));             // operand ends
     if (lop == BEHIND || lop == NOBEHIND) {
-      if (nr < 0) {
+      if (nr < 0 || nr > INT_MAX) {
         nr = 0;                 // no limit is same as zero limit
       }
       reginsert_nr(lop, (uint32_t)nr, ret);
@@ -11010,7 +11015,9 @@ static int nfa_regpiece(void)
     EMIT(i);
     if (i == NFA_PREV_ATOM_JUST_BEFORE
         || i == NFA_PREV_ATOM_JUST_BEFORE_NEG) {
-      EMIT((int)c2);
+      // A limit too large for an int means no limit, like in the
+      // backtracking engine.
+      EMIT(c2 > INT_MAX ? 0 : (int)c2);
     }
     break;
 
