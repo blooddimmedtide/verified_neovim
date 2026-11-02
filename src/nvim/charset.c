@@ -1086,8 +1086,10 @@ void vim_str2nr(const char *const start, int *const prep, int *const len, const 
   FUNC_ATTR_NONNULL_ARG(1)
 {
   const char *ptr = start;
+  // With maxlen == 0 the scan stops at INT_MAX characters, so that "*len"
+  // (an int) and the int index of the octal check below cannot overflow.
 #define STRING_ENDED(ptr) \
-  (!(maxlen == 0 || (int)((ptr) - start) < maxlen))
+  (!(maxlen == 0 ? (ptr) - start < INT_MAX : (ptr) - start < maxlen))
   int pre = 0;  // default is decimal
   const bool negative = (ptr[0] == '-');
   uvarnumber_T un = 0;
