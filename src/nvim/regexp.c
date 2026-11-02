@@ -10880,6 +10880,11 @@ collection:
     int plen;
 
 nfa_do_multibyte:
+    // A backslash before a character that can't be made magic is
+    // ignored (see peekchr()); the character itself starts after it.
+    if (*old_regparse == '\\' && c >= 0x80) {
+      old_regparse++;
+    }
     // plen is length of current char with composing chars
     if (utf_char2len(c) != (plen = utfc_ptr2len((char *)old_regparse))
         || utf_iscomposing_legacy(c)) {
