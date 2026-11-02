@@ -8723,6 +8723,15 @@ static const char e_ill_char_class[] = N_("E877: (NFA regexp) Invalid character 
 
 // Variables only used in nfa_regcomp() and descendants.
 static int nfa_re_flags;  ///< re_flags passed to nfa_regcomp().
+/// Set when a \{n,m} count would make the NFA program too big; vim_regcomp()
+/// then compiles the pattern with the backtracking engine.
+static bool nfa_too_big;
+
+/// Most postfix items a \{n,m} expansion may produce.  Each item becomes
+/// about one NFA state (40 bytes).  The limit keeps the largest patterns in
+/// the tests (about 8 million items, under half a gigabyte) on the NFA engine
+/// while stopping counts that would need many gigabytes.
+#define NFA_MAX_POSTFIX_LEN (1 << 24)
 static int *post_start;   ///< holds the postfix form of r.e.
 static size_t post_start_len;  ///< size of allocated post_start (in ints)
 static int *post_end;
@@ -8788,6 +8797,7 @@ static void nfa_regcomp_start(uint8_t *expr, int re_flags)
   post_ptr = post_start;
   post_end = post_start + post_start_len;
   wants_nfa = false;
+  nfa_too_big = false;
   rex.nfa_has_zend = false;
   rex.nfa_has_backref = false;
   nfa_reg_parse_depth = 0;
@@ -11086,6 +11096,20 @@ static int nfa_regpiece(void)
         && (maxval != MAX_LIMIT && minval < 200)
         && !wants_nfa) {
       return FAIL;
+    }
+
+    // The expansion makes "copies" copies of the atom, each followed by
+    // at most two more items.  When that is too big, fail and let
+    // vim_regcomp() use the backtracking engine, whichever engine was
+    // asked for: otherwise the allocation can make Nvim exit.
+    {
+      const int64_t atom_len = (int64_t)(post_ptr - post_start) - my_post_start;
+      const int64_t copies = maxval == MAX_LIMIT ? (int64_t)minval + 1 : (int64_t)maxval;
+      if (copies > NFA_MAX_POSTFIX_LEN
+          || my_post_start + copies * (atom_len + 2) > NFA_MAX_POSTFIX_LEN) {
+        nfa_too_big = true;
+        return FAIL;
+      }
     }
 
     // Ignore previous call to nfa_regatom()
@@ -16242,7 +16266,10 @@ regprog_T *vim_regcomp(const char *expr_arg, int re_flags)
     // also fails for patterns that it can't handle well but are still valid
     // patterns, thus a retry should work.
     // But don't try if an error message was given.
-    if (regexp_engine == AUTOMATIC_ENGINE && called_emsg == called_emsg_before) {
+    // Also when the NFA engine was asked for but the pattern is too big
+    // for it.
+    if ((regexp_engine == AUTOMATIC_ENGINE || (regexp_engine == NFA_ENGINE && nfa_too_big))
+        && called_emsg == called_emsg_before) {
       regexp_engine = BACKTRACKING_ENGINE;
       report_re_switch(expr);
       prog = bt_regengine.regcomp((uint8_t *)expr, re_flags);

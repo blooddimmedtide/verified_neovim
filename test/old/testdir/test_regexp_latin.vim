@@ -1230,5 +1230,14 @@ func Test_compare_column_matchstr()
   set re=0
 endfunc
 
+" A huge \{n,m} count must not make Nvim run out of memory: the pattern is
+" compiled with the backtracking engine instead, even when the NFA engine was
+" asked for.
+func Test_regexp_huge_count_falls_back()
+  call assert_equal(0, match('xx', '\%#=2x\{1,15555555}'))
+  call assert_equal(-1, match('xx', 'x\{300,15555555}'))
+  call assert_equal(-1, match('xx', '\%#=2x\{20000000}'))
+  call assert_equal(0, match('xxx', '\%#=2x\{3}'))
+endfunc
 
 " vim: shiftwidth=2 sts=2 expandtab
