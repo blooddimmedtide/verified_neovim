@@ -390,7 +390,7 @@ static int calc_hist_idx(int histype, int num)
     if (i >= 0 && hist[i].hisnum == num && hist[i].hisstr != NULL) {
       return i;
     }
-  } else if (-num <= hislen) {
+  } else if (num >= -hislen) {  // -num overflows for INT_MIN
     i += num + 1;
     if (i < 0) {
       i += hislen;
