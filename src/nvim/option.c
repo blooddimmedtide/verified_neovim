@@ -818,9 +818,9 @@ static char *stropt_expand_envvar(OptIndex opt_idx, const char *origval, char *n
   }
 
   xfree(newval);
-  uint32_t newlen = (unsigned)strlen(s) + 1;
+  size_t newlen = strlen(s) + 1;
   if (op != OP_NONE) {
-    newlen += (unsigned)strlen(origval) + 1;
+    newlen += strlen(origval) + 1;
   }
   newval = xmalloc(newlen);
   STRCPY(newval, s);
@@ -832,10 +832,10 @@ static char *stropt_expand_envvar(OptIndex opt_idx, const char *origval, char *n
 /// needed.
 static void stropt_concat_with_comma(const char *origval, char *newval, set_op_T op, uint32_t flags)
 {
-  int len = 0;
+  size_t len = 0;
   int comma = ((flags & kOptFlagComma) && *origval != NUL && *newval != NUL);
   if (op == OP_ADDING) {
-    len = (int)strlen(origval);
+    len = strlen(origval);
     // Strip a trailing comma, would get 2.
     if (comma && len > 1
         && (flags & kOptFlagOneComma) == kOptFlagOneComma
@@ -844,9 +844,9 @@ static void stropt_concat_with_comma(const char *origval, char *newval, set_op_T
       len--;
     }
     memmove(newval + len + comma, newval, strlen(newval) + 1);
-    memmove(newval, origval, (size_t)len);
+    memmove(newval, origval, len);
   } else {
-    len = (int)strlen(newval);
+    len = strlen(newval);
     STRMOVE(newval + len + comma, origval);
   }
   if (comma) {
@@ -1158,7 +1158,7 @@ static char *stropt_get_newval(OptIndex opt_idx, char **argp, void *varp, const 
 
       // if no duplicate, move pointer to end of original value
       if (s == NULL) {
-        s = origval + (int)strlen(origval);
+        s = origval + strlen(origval);
       }
     }
 
