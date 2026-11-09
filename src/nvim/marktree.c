@@ -484,11 +484,13 @@ static void meta_describe_node(uint32_t *meta_node, MTNode *x)
 
 static bool meta_has(const uint32_t *meta_count, MetaFilter meta_filter)
 {
-  uint32_t count = 0;
+  // Test each kind on its own: a running uint32_t sum of the counts can wrap to zero.
   for (int m = 0; m < kMTMetaCount; m++) {
-    count += meta_count[m] & meta_filter[m];
+    if (meta_count[m] & meta_filter[m]) {
+      return true;
+    }
   }
-  return count > 0;
+  return false;
 }
 
 void marktree_put_key(MarkTree *b, MTKey k)
