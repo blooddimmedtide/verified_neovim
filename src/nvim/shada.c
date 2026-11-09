@@ -3465,6 +3465,14 @@ shada_read_next_item_start:
         goto shada_read_next_item_error;
       }
       struct buffer_list_buffer *e = &entry->data.buffer_list.buffers[i];
+      if (additional_data_len((AdditionalData *)it_ad.items) > UINT32_MAX - 1) {
+        semsg(_(RERR "Error while reading ShaDa file: "
+                "buffer list at position %" PRIu64 " "
+                "contains entry with too many additional elements"),
+              initial_fpos);
+        kv_destroy(it_ad);
+        goto shada_read_next_item_error;
+      }
       e->additional_data = (AdditionalData *)it_ad.items;
       e->pos = default_pos;
       if (HAS_KEY(&it, _shada_buflist_item, l)) {
@@ -3519,6 +3527,15 @@ shada_read_next_item_start:
 
   if (read_size) {
     semsg(_(READERR("item", "additional bytes")), initial_fpos);
+    goto shada_read_next_item_error;
+  }
+
+  // An entry with more additional items than fit a MessagePack array32 (minus the
+  // fixed leading elements) cannot be written back: shada_pack_entry rebuilds the
+  // array header as a uint32 `k + additional_data_len()` (k <= 3), which would wrap
+  // and desynchronise the written ShaDa file. Reject it here instead.
+  if (additional_data_len((AdditionalData *)ad.items) > UINT32_MAX - 3) {
+    semsg(_(READERR("item", "has too many additional elements")), initial_fpos);
     goto shada_read_next_item_error;
   }
 
