@@ -2700,16 +2700,17 @@ int get4c(FILE *fd)
 /// @return  -1 when encountering EOF.
 time_t get8ctime(FILE *fd)
 {
-  time_t n = 0;
+  // Accumulate unsigned: shifting a signed value overflows when the first byte is >= 0x80.
+  uint64_t n = 0;
 
   for (int i = 0; i < 8; i++) {
     const int c = getc(fd);
     if (c == EOF) {
       return -1;
     }
-    n = (n << 8) + c;
+    n = (n << 8) + (uint64_t)c;
   }
-  return n;
+  return (time_t)n;
 }
 
 /// Reads a string of length "cnt" from "fd" into allocated memory.
