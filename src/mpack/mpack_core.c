@@ -57,7 +57,7 @@ MPACK_API int mpack_read(mpack_tokbuf_t *tokbuf, const char **buf,
      * *buf and *buflen */
     tok->type = MPACK_TOKEN_CHUNK;
     tok->data.chunk_ptr = *buf;
-    tok->length = MIN((mpack_uint32_t)*buflen, tokbuf->passthrough);
+    tok->length = (mpack_uint32_t)MIN(*buflen, (size_t)tokbuf->passthrough);
     tokbuf->passthrough -= tok->length;
     *buf += tok->length;
     *buflen -= tok->length;
