@@ -3618,7 +3618,7 @@ static int do_sub(exarg_T *eap, proftime_T tm, const int cmdpreview_ns,
   if (eap->cmd[0] == 's' && *cmd != NUL && !ascii_iswhite(*cmd)
       && vim_strchr("0123456789cegriIp|\"", (uint8_t)(*cmd)) == NULL) {
     // don't accept alphanumeric for separator
-    if (check_regexp_delim(*cmd) == FAIL) {
+    if (check_regexp_delim((uint8_t)(*cmd)) == FAIL) {
       return 0;
     }
 
@@ -4680,7 +4680,7 @@ void ex_global(exarg_T *eap)
   } else if (*cmd == NUL) {
     emsg(_("E148: Regular expression missing from global"));
     return;
-  } else if (check_regexp_delim(*cmd) == FAIL) {
+  } else if (check_regexp_delim((uint8_t)(*cmd)) == FAIL) {
     return;
   } else {
     delim = *cmd;               // get the delimiter
