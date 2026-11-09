@@ -170,7 +170,9 @@ const char *invocation_path_tail(const char *invocation, size_t *len)
       tail = p + 1;  // Now tail points one past the separator.
       tail_end = tail;
     } else if (*p == '\\' && inquote) {
+      // Skip the backslash and the whole character after it, but never the NUL.
       p++;
+      l = utfc_ptr2len(p);
     } else if (*p == '"') {
       inquote ^= 1;
     } else {
