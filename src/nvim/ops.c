@@ -280,9 +280,11 @@ static int get_vts(const int *vts_array, int index)
 }
 
 /// Return the sum of all the tabstops through the index-th.
-static int get_vts_sum(const int *vts_array, int index)
+/// The sum is 64-bit: index can be a shift count up to 999999999 times a tabstop up to
+/// TABSTOP_MAX, which does not fit in an int.
+static int64_t get_vts_sum(const int *vts_array, int index)
 {
-  int sum = 0;
+  int64_t sum = 0;
   int i;
 
   // Perform the summation for indices within the actual array.
@@ -292,7 +294,7 @@ static int get_vts_sum(const int *vts_array, int index)
 
   // Add tabstops whose indices exceed the actual array.
   if (i <= index) {
-    sum += vts_array[vts_array[0]] * (index - vts_array[0]);
+    sum += (int64_t)vts_array[vts_array[0]] * (index - vts_array[0]);
   }
 
   return sum;
