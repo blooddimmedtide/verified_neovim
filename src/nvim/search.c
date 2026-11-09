@@ -462,11 +462,20 @@ int last_csearch_until(void)
 void set_last_csearch(int c, char *s, int len)
 {
   *lastc = (uint8_t)c;
+  // A character with many composing characters can be longer than
+  // lastc_bytes: keep the whole characters that fit.
+  if (len > MAX_SCHAR_SIZE) {
+    len = MAX_SCHAR_SIZE;
+    while (len > 0 && utf_is_trail_byte((uint8_t)s[len])) {
+      len--;
+    }
+  }
   lastc_bytelen = len;
+  // Clear first, so no bytes of a longer previous character are left
+  // after the NUL.
+  CLEAR_FIELD(lastc_bytes);
   if (len) {
     memcpy(lastc_bytes, s, (size_t)len);
-  } else {
-    CLEAR_FIELD(lastc_bytes);
   }
 }
 
@@ -1587,6 +1596,7 @@ int searchc(cmdarg_T *cap, bool t_cmd)
       *lastc = (uint8_t)c;
       set_csearch_direction(dir);
       set_csearch_until(t_cmd);
+      CLEAR_FIELD(lastc_bytes);
       if (cap->nchar_len) {
         lastc_bytelen = cap->nchar_len;
         memcpy(lastc_bytes, cap->nchar_composing, (size_t)cap->nchar_len);
