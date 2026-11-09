@@ -2,6 +2,7 @@
 #include <lauxlib.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -4347,6 +4348,20 @@ varnumber_T tv_get_bool_chk(const typval_T *const tv, bool *const ret_error)
   return tv_get_number_chk(tv, ret_error);
 }
 
+/// Convert a Number to a line number without wrapping: values above MAXLNUM become
+/// MAXLNUM (past any buffer end), values below INT32_MIN become INT32_MIN (invalid).
+static linenr_T tv_number_to_lnum(const varnumber_T n)
+  FUNC_ATTR_CONST FUNC_ATTR_WARN_UNUSED_RESULT
+{
+  if (n > MAXLNUM) {
+    return MAXLNUM;
+  }
+  if (n < INT32_MIN) {
+    return INT32_MIN;
+  }
+  return (linenr_T)n;
+}
+
 /// Get the line number from Vimscript object
 ///
 /// @param[in]  tv  Object to get value from. Is expected to be a number or
@@ -4358,7 +4373,7 @@ linenr_T tv_get_lnum(const typval_T *const tv)
   FUNC_ATTR_NONNULL_ALL FUNC_ATTR_WARN_UNUSED_RESULT
 {
   const int did_emsg_before = did_emsg;
-  linenr_T lnum = (linenr_T)tv_get_number_chk(tv, NULL);
+  linenr_T lnum = tv_number_to_lnum(tv_get_number_chk(tv, NULL));
   if (lnum <= 0 && did_emsg_before == did_emsg && tv->v_type != VAR_NUMBER) {
     int fnum;
     // No valid number, try using same function as line() does.
@@ -4390,7 +4405,7 @@ linenr_T tv_get_lnum_buf(const typval_T *const tv, const buf_T *const buf)
       && buf != NULL) {
     return buf->b_ml.ml_line_count;
   }
-  return (linenr_T)tv_get_number_chk(tv, NULL);
+  return tv_number_to_lnum(tv_get_number_chk(tv, NULL));
 }
 
 /// Get the floating-point value of a Vimscript object
