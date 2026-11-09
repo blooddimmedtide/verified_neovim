@@ -733,12 +733,10 @@ static int utf_safe_read_char_adv(const char **s, size_t *n)
     // illegal (k=0), and it's also safe to use utf_ptr2char().
     int c = utf_ptr2char(*s);
 
-    // On failure, utf_ptr2char() returns the first byte, so here we
-    // check equality with the first byte. The only non-ASCII character
-    // which equals the first byte of its own UTF-8 representation is
-    // U+00C3 (UTF-8: 0xC3 0x83), so need to check that special case too.
-    // It's safe even if n=1, else we would have k=2 > n.
-    if (c != (int)((uint8_t)(**s)) || (c == 0xC3 && (uint8_t)(*s)[1] == 0x83)) {
+    // The sequence decoded when utf_ptr2len() agrees with the announced
+    // length k (k == 0 for an illegal lead byte never matches). Comparing c
+    // with the first byte misses overlong forms whose value equals it.
+    if (utf_ptr2len(*s) == k) {
       // byte sequence was successfully decoded
       *s += k;
       *n -= k;
