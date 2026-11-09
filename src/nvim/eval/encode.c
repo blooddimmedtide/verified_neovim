@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -638,6 +639,16 @@ static inline int convert_to_json_string(garray_T *const gap, const char *const 
 #define ENCODE_RAW(ch) \
   ((ch) >= 0x20 && utf_printable(ch))
     for (size_t i = 0; i < utf_len;) {
+      // "buf" need not be NUL-terminated (encode_vim_list_to_buf() output):
+      // reject a sequence cut off by the end before decoding reads past it.
+      const size_t rest = utf_len - i;
+      if ((size_t)utf_ptr2len_len(utf_buf + i, (int)MIN(rest, (size_t)INT_MAX)) > rest) {
+        semsg(_("E474: String \"%.*s\" contains byte that does not start "
+                "any UTF-8 character"),
+              (int)rest, utf_buf + i);
+        xfree(tofree);
+        return FAIL;
+      }
       const int ch = utf_ptr2char(utf_buf + i);
       const size_t shift = (ch == 0 ? 1 : ((size_t)utf_ptr2len(utf_buf + i)));
       assert(shift > 0);
