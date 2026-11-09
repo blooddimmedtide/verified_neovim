@@ -748,7 +748,7 @@ void *arena_alloc(Arena *arena, size_t size, bool align)
     arena_alloc_block(arena);
   }
   size_t alloc_pos = align ? arena_align_offset(arena->pos) : arena->pos;
-  if (alloc_pos + size > arena->size) {
+  if (size > arena->size - alloc_pos) {
     if (size > (ARENA_BLOCK_SIZE - sizeof(struct consumed_blk)) >> 1) {
       // if allocation is too big, allocate a large block with the requested
       // size, but still with block pointer head. We do this even for
@@ -757,6 +757,9 @@ void *arena_alloc(Arena *arena, size_t size, bool align)
       arena_alloc_count++;
       size_t hdr_size = sizeof(struct consumed_blk);
       size_t aligned_hdr_size = (align ? arena_align_offset(hdr_size) : hdr_size);
+      if (size > SIZE_MAX - aligned_hdr_size) {
+        preserve_exit(e_outofmem);  // size + header would wrap
+      }
       char *alloc = xmalloc(size + aligned_hdr_size);
 
       // to simplify free-list management, arena->cur_blk must
@@ -809,6 +812,9 @@ void arena_mem_free(ArenaMem mem)
 
 char *arena_allocz(Arena *arena, size_t size)
 {
+  if (size == SIZE_MAX) {
+    preserve_exit(e_outofmem);  // size + 1 would wrap
+  }
   char *mem = arena_alloc(arena, size + 1, false);
   mem[size] = NUL;
   return mem;
