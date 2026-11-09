@@ -172,7 +172,7 @@ static int ends_with_optional_cr(const char *l, long s, long i)
 
 int xdl_recmatch(const char *l1, long s1, const char *l2, long s2, long flags)
 {
-	int i1, i2;
+	long i1, i2;
 
 	if (s1 == s2 && !memcmp(l1, l2, s1))
 		return 1;
