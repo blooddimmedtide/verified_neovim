@@ -545,7 +545,10 @@ int find_special_key(const char **const srcp, const size_t src_len, int *const m
           && ascii_isdigit(last_dash[6])) {
         // <Char-123> or <Char-033> or <Char-0x33>
         vim_str2nr(last_dash + 6, NULL, &l, STR2NR_ALL, NULL, &n, 0, true, NULL);
-        if (l == 0) {
+        // A character number must fit in a non-negative int: (int)n of a larger
+        // value is negative, which is a special key code, and KEY2TERMCAP0()
+        // of INT_MIN negates INT_MIN (undefined behavior).
+        if (l == 0 || n > INT_MAX) {
           emsg(_(e_invarg));
           return 0;
         }
