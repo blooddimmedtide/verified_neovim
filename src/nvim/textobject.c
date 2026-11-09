@@ -241,7 +241,7 @@ static bool inmacro(char *opt, const char *s)
     if ((macro[0] == s[0]
          || (macro[0] == ' '
              && (s[0] == NUL || s[0] == ' ')))
-        && (macro[1] == s[1]
+        && ((s[0] != NUL && macro[1] == s[1])
             || ((macro[1] == NUL || macro[1] == ' ')
                 && (s[0] == NUL || s[1] == NUL || s[1] == ' ')))) {
       break;
