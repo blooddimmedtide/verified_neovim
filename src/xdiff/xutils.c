@@ -153,21 +153,17 @@ int xdl_blankline(const char *line, long size, long flags)
 }
 
 /*
- * Have we eaten everything on the line, except for an optional
- * CR at the very end?
+ * Length of the line without its end: "\n" or "\r\n".
+ * A CR at the end of an incomplete line is kept.
  */
-static int ends_with_optional_cr(const char *l, long s, long i)
+static long len_without_eol(const char *l, long s)
 {
-	int complete = s && l[s-1] == '\n';
-
-	if (complete)
+	if (s && l[s-1] == '\n') {
 		s--;
-	if (s == i)
-		return 1;
-	/* do not ignore CR at the end of an incomplete line */
-	if (complete && s == i + 1 && l[i] == '\r')
-		return 1;
-	return 0;
+		if (s && l[s-1] == '\r')
+			s--;
+	}
+	return s;
 }
 
 int xdl_recmatch(const char *l1, long s1, const char *l2, long s2, long flags)
@@ -220,13 +216,13 @@ int xdl_recmatch(const char *l1, long s1, const char *l2, long s2, long flags)
 			i2++;
 		}
 	} else if (flags & XDF_IGNORE_CR_AT_EOL) {
-		/* Find the first difference and see how the line ends */
-		while (i1 < s1 && i2 < s2 && l1[i1] == l2[i2]) {
-			i1++;
-			i2++;
-		}
-		return (ends_with_optional_cr(l1, s1, i1) &&
-			ends_with_optional_cr(l2, s2, i2));
+		/*
+		 * Compare the lines without their ends. Matching the common
+		 * prefix first would let the CR that ends one line match a CR
+		 * inside the other ("\r" and "\r\n").
+		 */
+		long e1 = len_without_eol(l1, s1), e2 = len_without_eol(l2, s2);
+		return e1 == e2 && !memcmp(l1, l2, e1);
 	}
 
 	/*
