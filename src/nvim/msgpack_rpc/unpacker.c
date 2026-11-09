@@ -221,7 +221,7 @@ bool unpacker_parse_header(Unpacker *p)
   if (tok.type != MPACK_TOKEN_UINT) {
     goto error;
   }
-  uint32_t type = (uint32_t)mpack_unpack_uint(tok);
+  uint64_t type = mpack_unpack_uint(tok);
   if ((array_length == 3) ? type != 2 : (type >= 2)) {
     goto error;
   }
@@ -233,7 +233,11 @@ bool unpacker_parse_header(Unpacker *p)
     if (tok.type != MPACK_TOKEN_UINT) {
       goto error;
     }
-    p->request_id = (uint32_t)mpack_unpack_uint(tok);
+    uint64_t request_id = mpack_unpack_uint(tok);
+    if (request_id > UINT32_MAX) {  // msgpack-rpc msgid is a 32-bit unsigned integer
+      goto error;
+    }
+    p->request_id = (uint32_t)request_id;
   }
 
   if (p->type != kMessageTypeResponse) {
