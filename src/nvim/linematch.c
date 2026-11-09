@@ -49,7 +49,7 @@ static int matching_chars_iwhite(const mmfile_t *s1, const mmfile_t *s2)
     const mmfile_t *s = k == 0 ? s1 : s2;
     size_t pi = 0;
     size_t slen = MIN(MATCH_CHAR_MAX_LEN - 1, line_len(s));
-    for (size_t i = 0; i < slen; i++) {
+    for (size_t i = 0; i <= slen && i < (size_t)s->size; i++) {
       char e = s->ptr[i];
       if (e != ' ' && e != '\t') {
         p[k][pi] = e;
