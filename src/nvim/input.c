@@ -532,7 +532,7 @@ void flush_buffers(flush_buffers_T flush_typeahead)
   typebuf.tb_silent = 0;
   cmd_silent = false;
   typebuf.tb_no_abbr_cnt = 0;
-  if (++typebuf.tb_change_cnt == 0) {
+  if (typebuf.tb_change_cnt == INT_MAX || ++typebuf.tb_change_cnt == 0) {
     typebuf.tb_change_cnt = 1;
   }
 }
@@ -970,12 +970,19 @@ int ins_typebuf(char *str, int noremap, int offset, bool nottyped, bool silent)
   int nrm;
 
   init_typebuf();
-  if (++typebuf.tb_change_cnt == 0) {
+  if (typebuf.tb_change_cnt == INT_MAX || ++typebuf.tb_change_cnt == 0) {
     typebuf.tb_change_cnt = 1;
   }
   state_no_longer_safe("ins_typebuf()");
 
-  int addlen = (int)strlen(str);
+  const size_t slen = strlen(str);
+  if (slen > (size_t)(INT_MAX - 5 * (MAXMAPLEN + 4))) {
+    // string is too long for the int sizes below
+    emsg(_(e_command_too_complex));  // also calls flush_buffers
+    setcursor();
+    return FAIL;
+  }
+  int addlen = (int)slen;
 
   if (offset == 0 && addlen <= typebuf.tb_off) {
     // Easy case: there is room in front of typebuf.tb_buf[typebuf.tb_off]
@@ -1188,7 +1195,7 @@ void del_typebuf(int len, int offset)
   // Reset the flag that text received from a client or from feedkeys()
   // was inserted in the typeahead buffer.
   typebuf_was_filled = false;
-  if (++typebuf.tb_change_cnt == 0) {
+  if (typebuf.tb_change_cnt == INT_MAX || ++typebuf.tb_change_cnt == 0) {
     typebuf.tb_change_cnt = 1;
   }
 }
@@ -1347,7 +1354,7 @@ static void alloc_typebuf(void)
   typebuf.tb_maplen = 0;
   typebuf.tb_silent = 0;
   typebuf.tb_no_abbr_cnt = 0;
-  if (++typebuf.tb_change_cnt == 0) {
+  if (typebuf.tb_change_cnt == INT_MAX || ++typebuf.tb_change_cnt == 0) {
     typebuf.tb_change_cnt = 1;
   }
   typebuf_was_filled = false;
