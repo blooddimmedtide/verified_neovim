@@ -2750,7 +2750,7 @@ int put_time(FILE *fd, time_t time_)
 {
   uint8_t buf[8];
   time_to_bytes(time_, buf);
-  return fwrite(buf, sizeof(uint8_t), ARRAY_SIZE(buf), fd) == 1 ? OK : FAIL;
+  return fwrite(buf, sizeof(uint8_t), ARRAY_SIZE(buf), fd) == ARRAY_SIZE(buf) ? OK : FAIL;
 }
 
 static int rename_with_tmp(const char *const from, const char *const to)
