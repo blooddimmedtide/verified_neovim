@@ -69,7 +69,7 @@ typedef struct mtnode_s MTNode;
 
 typedef struct {
   uint32_t nitems;
-  uint32_t nbytes;
+  size_t nbytes;
   char data[];
 } AdditionalData;
 

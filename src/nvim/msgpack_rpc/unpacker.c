@@ -609,7 +609,7 @@ void push_additional_data(AdditionalDataBuilder *ad, const char *data, size_t si
   }
   AdditionalData *a = (AdditionalData *)ad->items;
   a->nitems++;
-  a->nbytes += (uint32_t)size;
+  a->nbytes += size;
   kv_concat_len(*ad, data, size);
 }
 
