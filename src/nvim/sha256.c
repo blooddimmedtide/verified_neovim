@@ -185,12 +185,14 @@ void sha256_update(context_sha256_T *ctx, const uint8_t *input, size_t length)
 
   uint32_t left = ctx->total[0] & (SHA256_BUFFER_SIZE - 1);  // left < buf size
 
-  ctx->total[0] += (uint32_t)length;
-  ctx->total[0] &= 0xFFFFFFFF;
+  // total[1]:total[0] is the 64-bit byte count; add all of length, not only its low word.
+  uint32_t len_lo = (uint32_t)length;
+  ctx->total[0] += len_lo;
 
-  if (ctx->total[0] < length) {
+  if (ctx->total[0] < len_lo) {
     ctx->total[1]++;
   }
+  ctx->total[1] += (uint32_t)((uint64_t)length >> 32);
 
   size_t fill = SHA256_BUFFER_SIZE - left;
 
