@@ -137,6 +137,10 @@ void mh_realloc(MapHash *h, uint32_t n_min_buckets)
 {
   xfree(h->hash);
   uint32_t n_buckets = n_min_buckets < 16 ? 16 : n_min_buckets;
+  if (n_buckets > ((uint32_t)1 << 31)) {
+    // 2^31 is the largest power of two in uint32_t: roundup32 would wrap to 0
+    abort();
+  }
   roundup32(n_buckets);
   // sets all buckets to EMPTY
   h->hash = xcalloc(n_buckets, sizeof *h->hash);
