@@ -1692,7 +1692,7 @@ static int find_key_len(const char *arg_arg, size_t len, bool has_lt)
   // Don't use get_special_key_code() for t_xx, we don't want it to call
   // add_termcap_entry().
   if (len >= 4 && arg[0] == 't' && arg[1] == '_') {
-    if (!has_lt || arg[4] == '>') {
+    if (!has_lt || (len > 4 && arg[4] == '>')) {
       key = TERMCAP2KEY((uint8_t)arg[2], (uint8_t)arg[3]);
     }
   } else if (has_lt) {
